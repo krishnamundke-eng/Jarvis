@@ -1,5 +1,4 @@
 package com.krishna.jarvis
-
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraManager
@@ -15,6 +14,11 @@ import androidx.appcompat.app.AppCompatActivity
 class MainActivity : AppCompatActivity() {
 
     private lateinit var status: TextView
+
+    private val fillers = setOf(
+        "jarvis", "open", "kholo", "khol", "do", "the", "app", "ko",
+        "karo", "kar", "please", "launch", "start", "chalu", "a", "an"
+    )
 
     private val voiceLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -40,7 +44,7 @@ class MainActivity : AppCompatActivity() {
         status = TextView(this)
         status.gravity = Gravity.CENTER
         status.textSize = 18f
-        status.text = "Bolo: torch chalu, torch band, ya YouTube kholo"
+        status.text = "Bolo: torch on, torch off, ya open YouTube"
 
         layout.addView(button)
         layout.addView(status)
@@ -60,6 +64,15 @@ class MainActivity : AppCompatActivity() {
         cm.setTorchMode(cm.cameraIdList[0], on)
     }
 
+    private fun cleanName(text: String): String {
+        val words = text.split(" ").filter { it.isNotBlank() && it !in fillers }
+        val unique = mutableListOf<String>()
+        for (w in words) {
+            if (unique.isEmpty() || unique.last() != w) unique.add(w)
+        }
+        return unique.joinToString(" ")
+    }
+
     private fun handle(text: String) {
         if (text.contains("torch") || text.contains("flashlight")) {
             if (text.contains("band") || text.contains("off")) {
@@ -72,20 +85,21 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val name = text
-            .replace("jarvis", "")
-            .replace("kholo", "")
-            .replace("open", "")
-            .replace("khol do", "")
-            .trim()
+        val name = cleanName(text)
+        if (name.isEmpty()) {
+            status.text = "Kaun sa app kholna hai?"
+            return
+        }
 
         val pm = packageManager
         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val match = pm.queryIntentActivities(launcher, 0).firstOrNull {
-            it.loadLabel(pm).toString().lowercase().contains(name)
+        val apps = pm.queryIntentActivities(launcher, 0)
+        val match = apps.firstOrNull {
+            val label = it.loadLabel(pm).toString().lowercase()
+            label.contains(name) || (label.length >= 3 && name.contains(label))
         }
         val launch = match?.let { pm.getLaunchIntentForPackage(it.activityInfo.packageName) }
-        if (launch != null && name.isNotEmpty()) {
+        if (launch != null) {
             status.text = "Khol raha hu: $name"
             startActivity(launch)
         } else {
