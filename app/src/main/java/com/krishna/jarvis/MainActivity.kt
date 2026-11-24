@@ -694,8 +694,17 @@ class MainActivity : AppCompatActivity() {
                     say("टॉर्च चालू कर दी")
                 }
             }
-
-            else -> openApp(text)
-        }
-    }
-}
+            else -> {
+                if (text.startsWith("open ") || text.contains("kholo")) {
+                    openApp(text)
+                } else {
+                    val key = prefs.getString("apikey", "") ?: ""
+                    if (key.isEmpty()) {
+                        say("पहले सेटिंग्स में API key डालिए")
+                    } else {
+                        addBubble("सोच रहा हूँ...", false)
+                        Ai.ask(key, text) { reply -> runOnUiThread { say(reply) } }
+                    }
+                }
+            }
+            
