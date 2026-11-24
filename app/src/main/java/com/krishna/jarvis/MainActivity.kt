@@ -1,23 +1,36 @@
 package com.krishna.jarvis
+
 import android.content.Context
 import android.content.Intent
 import android.hardware.camera2.CameraManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
 import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import java.util.Calendar
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var status: TextView
+    private var tts: TextToSpeech? = null
 
     private val fillers = setOf(
         "jarvis", "open", "kholo", "khol", "do", "the", "app", "ko",
         "karo", "kar", "please", "launch", "start", "chalu", "a", "an"
+    )
+
+    private val months = arrayOf(
+        "जनवरी", "फरवरी", "मार्च", "अप्रैल", "मई", "जून",
+        "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"
+    )
+    private val days = arrayOf(
+        "रविवार", "सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार"
     )
 
     private val voiceLauncher = registerForActivityResult(
@@ -35,6 +48,15 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        tts = TextToSpeech(this) { s ->
+            if (s == TextToSpeech.SUCCESS) {
+                val r = tts?.setLanguage(Locale("hi", "IN"))
+                if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    tts?.setLanguage(Locale("en", "IN"))
+                }
+            }
+        }
+
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
         layout.gravity = Gravity.CENTER
@@ -44,7 +66,7 @@ class MainActivity : AppCompatActivity() {
         status = TextView(this)
         status.gravity = Gravity.CENTER
         status.textSize = 18f
-        status.text = "Bolo: torch on, torch off, ya open YouTube"
+        status.text = "Bolo: hello, time, date, torch on, open YouTube"
 
         layout.addView(button)
         layout.addView(status)
@@ -57,6 +79,17 @@ class MainActivity : AppCompatActivity() {
             i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Boliye...")
             voiceLauncher.launch(i)
         }
+    }
+
+    override fun onDestroy() {
+        tts?.stop()
+        tts?.shutdown()
+        super.onDestroy()
+    }
+
+    private fun say(msg: String) {
+        status.text = msg
+        tts?.speak(msg, TextToSpeech.QUEUE_FLUSH, null, "jarvis")
     }
 
     private fun setTorch(on: Boolean) {
@@ -74,20 +107,48 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handle(text: String) {
+        if (text.contains("hello") || text.contains("namaste") || text == "hi") {
+            say("नमस्ते, मैं जार्विस हूँ। बताइए, क्या करूँ?")
+            return
+        }
+
+        if (text.contains("time") || text.contains("samay") || text.contains("baje")) {
+            val c = Calendar.getInstance()
+            var h = c.get(Calendar.HOUR) 
+            if (h == 0) h = 12
+            val m = c.get(Calendar.MINUTE)
+            if (m == 0) {
+                say("अभी $h बजे हैं")
+            } else {
+                say("अभी $h बजकर $m मिनट हुए हैं")
+            }
+            return
+        }
+
+        if (text.contains("date") || text.contains("tarikh") || text.contains("today") || text.contains("day")) {
+            val c = Calendar.getInstance()
+            val d = c.get(Calendar.DAY_OF_MONTH)
+            val mo = months[c.get(Calendar.MONTH)]
+            val y = c.get(Calendar.YEAR)
+            val dn = days[c.get(Calendar.DAY_OF_WEEK) - 1]
+            say("आज $d $mo $y, $dn है")
+            return
+        }
+
         if (text.contains("torch") || text.contains("flashlight")) {
             if (text.contains("band") || text.contains("off")) {
                 setTorch(false)
-                status.text = "Torch band kar di"
+                say("टॉर्च बंद कर दी")
             } else {
                 setTorch(true)
-                status.text = "Torch chalu kar di"
+                say("टॉर्च चालू कर दी")
             }
             return
         }
 
         val name = cleanName(text)
         if (name.isEmpty()) {
-            status.text = "Kaun sa app kholna hai?"
+            say("कौन सा ऐप खोलना है?")
             return
         }
 
@@ -100,10 +161,10 @@ class MainActivity : AppCompatActivity() {
         }
         val launch = match?.let { pm.getLaunchIntentForPackage(it.activityInfo.packageName) }
         if (launch != null) {
-            status.text = "Khol raha hu: $name"
+            say("$name खोल रहा हूँ")
             startActivity(launch)
         } else {
-            status.text = "App nahi mila: $name"
+            say("$name नाम का ऐप नहीं मिला")
         }
     }
 }
