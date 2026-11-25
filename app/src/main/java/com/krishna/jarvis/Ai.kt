@@ -9,24 +9,27 @@ object Ai {
 
     const val MODEL = "gemini-3.5-flash-lite"
 
-    private const val RULES =
-        "You are JARVIS, a friendly voice assistant on an Android phone. " +
-        "Reply in the same language the user used (Hindi, Hinglish or English). " +
-        "If the user wrote Hinglish in roman letters, reply in Hindi using Devanagari. " +
-        "Keep replies short: 1 to 3 sentences, plain text only, no markdown, no emojis."
-
-    fun ask(key: String, question: String, onResult: (String) -> Unit) {
+    fun ask(key: String, prompt: String, hindi: Boolean, onResult: (String) -> Unit) {
         Thread {
             val reply = try {
-                call(key, question)
+                call(key, prompt, hindi)
             } catch (e: Exception) {
-                "इंटरनेट में दिक्कत है, कनेक्शन जाँच लीजिए"
+                if (hindi) "इंटरनेट में दिक्कत है, कनेक्शन जाँच लीजिए"
+                else "Internet problem. Please check your connection."
             }
             onResult(reply)
         }.start()
     }
 
-    private fun call(key: String, question: String): String {
+    private fun call(key: String, prompt: String, hindi: Boolean): String {
+        val rules =
+            "You are JARVIS, a friendly and smart assistant on an Android phone, " +
+            "like the assistant in Iron Man. " +
+            (if (hindi) "Always reply in Hindi (Devanagari script). "
+            else "Always reply in English. ") +
+            "Be clear and concise: usually 1 to 4 sentences unless the user asks for detail. " +
+            "Plain text only, no markdown, no asterisks, no emojis."
+
         val url = URL(
             "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent"
         )
@@ -39,11 +42,11 @@ object Ai {
         con.setRequestProperty("x-goog-api-key", key)
 
         val sys = JSONObject().put(
-            "parts", JSONArray().put(JSONObject().put("text", RULES))
+            "parts", JSONArray().put(JSONObject().put("text", rules))
         )
         val user = JSONObject()
             .put("role", "user")
-            .put("parts", JSONArray().put(JSONObject().put("text", question)))
+            .put("parts", JSONArray().put(JSONObject().put("text", prompt)))
         val body = JSONObject()
             .put("systemInstruction", sys)
             .put("contents", JSONArray().put(user))
@@ -53,10 +56,18 @@ object Ai {
         val code = con.responseCode
         if (code != 200) {
             return when (code) {
-                400, 403 -> "API key सही नहीं है, सेटिंग्स में दोबारा डालिए"
-                404 -> "AI मॉडल नहीं मिला, मॉडल का नाम बदलना पड़ेगा"
-                429 -> "अभी बहुत सवाल हो गए, थोड़ी देर बाद पूछिए"
-                else -> "AI से जवाब नहीं आया, कोड $code"
+                400, 403 ->
+                    if (hindi) "API key सही नहीं है, सेटिंग्स में दोबारा डालिए"
+                    else "The API key looks wrong. Please enter it again in Settings."
+                404 ->
+                    if (hindi) "AI मॉडल नहीं मिला, मॉडल का नाम बदलना पड़ेगा"
+                    else "The AI model was not found. The model name needs to be changed."
+                429 ->
+                    if (hindi) "अभी बहुत सवाल हो गए, थोड़ी देर बाद पूछिए"
+                    else "Too many questions right now. Please try again in a minute."
+                else ->
+                    if (hindi) "AI से जवाब नहीं आया, कोड $code"
+                    else "No answer from the AI. Code $code"
             }
         }
 
@@ -69,6 +80,8 @@ object Ai {
             sb.append(parts.getJSONObject(i).optString("text", ""))
         }
         val out = sb.toString().trim()
-        return if (out.isEmpty()) "मुझे जवाब नहीं मिला" else out
+        return if (out.isEmpty()) {
+            if (hindi) "मुझे जवाब नहीं मिला" else "I couldn't get an answer."
+        } else out
     }
 }
