@@ -660,6 +660,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun handle(text: String) {
         when {
+text.startsWith("reply") || text.startsWith("jawab") ->
+    say(JarvisNotificationService.sendReply(text))
+
+text.contains("message padho") || text.contains("read message") ->
+    say(JarvisNotificationService.readLast())            
             text.contains("hello") || text.contains("namaste") || text == "hi" ->
                 say("नमस्ते, मैं जार्विस हूँ। बताइए, क्या करूँ?")
 
